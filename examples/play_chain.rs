@@ -10,6 +10,9 @@ fn main() {
     table.insert("dog".into(), 27);
     table.insert("oval".into(), 33);
     table.insert("key".into(), 41);
+    table.insert("Cow".into(), 144);
+    println!("Gonna resize: {:?}", table);
+    table.insert("resize".into(), 2);
     println!("Insert complete: {:?}", table);
     table.remove("key".into());
     println!("Final: {:?}", table);

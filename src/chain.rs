@@ -1,4 +1,4 @@
-use std::mem::replace;
+use std::mem::{replace, take};
 
 use crate::{hash, HashTable};
 
@@ -27,6 +27,23 @@ impl ChainTable {
             .position(|(k, _)| k == key)
             .map(|minor_index| (store_index, minor_index))
     }
+
+    fn need_to_resize(&self) -> bool {
+        self.size >= self.store.len()
+    }
+
+    fn resize(&mut self) {
+        let mut new_table = Self {
+            store: vec![vec![]; self.store.len() * 2 + 1],
+            size: 0,
+        };
+        for cell in take(&mut self.store) {
+            for (k, v) in cell {
+                new_table.insert(k, v);
+            }
+        }
+        *self = new_table;
+    }
 }
 
 impl Default for ChainTable {
@@ -40,6 +57,9 @@ impl HashTable for ChainTable {
         if let Some(old_value) = self.get_mut(&key) {
             Some(replace(old_value, value))
         } else {
+            if self.need_to_resize() {
+                self.resize();
+            }
             let index = self.get_store_index(&key);
             self.store[index].push((key, value));
             self.size += 1;
