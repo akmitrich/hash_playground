@@ -1,0 +1,12 @@
+key 42
+cat 88
+dog 21
+oval 55
+knight -33
+over 28
+god 73
+face -65
+track 1
+flat 29
+day 18
+sunday -100

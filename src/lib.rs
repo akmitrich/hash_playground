@@ -9,8 +9,8 @@ pub mod open;
 pub trait HashTable {
     fn insert(&mut self, key: String, value: i64) -> Option<i64>;
     fn remove(&mut self, key: String) -> Option<i64>;
-    fn get(&self, key: &String) -> Option<&i64>;
-    fn get_mut(&mut self, key: &String) -> Option<&mut i64>;
+    fn get(&self, key: &str) -> Option<&i64>;
+    fn get_mut(&mut self, key: &str) -> Option<&mut i64>;
 }
 
 pub(crate) fn hash(key: &str) -> usize {
