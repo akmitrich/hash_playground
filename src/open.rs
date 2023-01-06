@@ -29,7 +29,7 @@ impl OpenTable {
     }
 
     fn probing(&self, hash: usize, probe: usize) -> usize {
-        (hash + probe) % self.capacity()
+        probbing(hash, probe, self.capacity())
     }
 
     fn find_index(&self, key: &str) -> Option<usize> {
@@ -83,25 +83,22 @@ impl HashTable for OpenTable {
         let hash = hash(&key);
         let mut probe = 0;
         let mut first_erased = None;
-        let mut index = loop {
+        let first_empty = loop {
             let index = self.probing(hash, probe);
             match self.store[index] {
                 OpenCell::Empty => break index,
+                OpenCell::Erased(_, _) => {
+                    first_erased = first_erased.or(Some(index));
+                    probe += 1;
+                }
                 OpenCell::Taken(ref k, ref mut v) if k == &key => {
                     return Some(replace(v, value));
                 }
-                OpenCell::Taken(_, _) => probe += 1,
-                OpenCell::Erased(_, _) => {
-                    if first_erased.is_none() {
-                        first_erased = Some(index)
-                    }
-                }
+                _ => probe += 1,
             }
         };
-        if let Some(erased) = first_erased {
-            index = erased;
-        }
         self.size += 1;
+        let index = first_erased.unwrap_or(first_empty);
         self.store[index] = OpenCell::Taken(key, value);
         None
     }
@@ -119,7 +116,7 @@ impl HashTable for OpenTable {
 
     fn get(&self, key: &str) -> Option<&i64> {
         let index = self.find_index(key)?;
-        if let OpenCell::Taken(_, value) = self.store.get(index).unwrap() {
+        if let OpenCell::Taken(_, value) = &self.store[index] {
             Some(value)
         } else {
             unreachable!()
@@ -127,13 +124,45 @@ impl HashTable for OpenTable {
     }
 
     fn get_mut(&mut self, key: &str) -> Option<&mut i64> {
-        let index = self.find_index(key)?;
-        if let OpenCell::Taken(_, value) = self.store.get_mut(index).unwrap() {
-            Some(value)
-        } else {
-            unreachable!()
+        fn lazy_deletion(store: &mut [OpenCell], key: &str) -> (Option<usize>, Option<usize>) {
+            let mut erased = None;
+            let hash = hash(key);
+            let mut probe = 0;
+            loop {
+                let index = probbing(hash, probe, store.len());
+                match store[index] {
+                    OpenCell::Empty => break (None, erased),
+                    OpenCell::Taken(ref k, _) if k == key => break (Some(index), erased),
+                    OpenCell::Taken(_, _) => probe += 1,
+                    OpenCell::Erased(_, _) => {
+                        erased = erased.or(Some(index));
+                        probe += 1;
+                    }
+                }
+            }
+        }
+
+        fn make_some_value_from_taken(taken: &mut OpenCell) -> Option<&mut i64> {
+            if let OpenCell::Taken(_, value) = taken {
+                Some(value)
+            } else {
+                unreachable!()
+            }
+        }
+
+        match lazy_deletion(&mut self.store, key) {
+            (None, _) => None,
+            (Some(index), None) => make_some_value_from_taken(&mut self.store[index]),
+            (Some(index), Some(erased)) => {
+                self.store.swap(index, erased);
+                make_some_value_from_taken(&mut self.store[erased]) //erased is taken after swap
+            }
         }
     }
+}
+
+fn probbing(hash: usize, probe: usize, capacity: usize) -> usize {
+    (hash + probe) % capacity
 }
 
 #[cfg(test)]
@@ -148,8 +177,8 @@ mod tests {
         let input = File::open("test_dict.txt").expect("Unable to open 'test_dict.txt'");
         io::BufReader::new(input)
             .lines()
-            .map(|l| {
-                let line = l.unwrap();
+            .map(|line| {
+                let line = line.unwrap();
                 let mut data = line.split(' ');
                 let key = data.next().unwrap().to_string();
                 let value = data.next().unwrap().parse::<i64>().unwrap();
