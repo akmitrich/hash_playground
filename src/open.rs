@@ -29,7 +29,7 @@ impl OpenTable {
     }
 
     fn probing(&self, hash: usize, probe: usize) -> usize {
-        probbing(hash, probe, self.capacity())
+        probing(hash, probe, self.capacity())
     }
 
     fn find_index(&self, key: &str) -> Option<usize> {
@@ -129,7 +129,7 @@ impl HashTable for OpenTable {
             let hash = hash(key);
             let mut probe = 0;
             loop {
-                let index = probbing(hash, probe, store.len());
+                let index = probing(hash, probe, store.len());
                 match store[index] {
                     OpenCell::Empty => break (None, erased),
                     OpenCell::Taken(ref k, _) if k == key => break (Some(index), erased),
@@ -161,8 +161,8 @@ impl HashTable for OpenTable {
     }
 }
 
-fn probbing(hash: usize, probe: usize, capacity: usize) -> usize {
-    (hash + probe) % capacity
+fn probing(hash: usize, probe: usize, capacity: usize) -> usize {
+    (hash + probe * probe) % capacity // Quadratic probing
 }
 
 #[cfg(test)]
